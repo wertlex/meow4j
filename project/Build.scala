@@ -17,7 +17,8 @@ object ApplicationBuild extends Build {
   )
 
   lazy val coreDeps = Seq(
-  ) ++ Akka.coreDeps ++ Akka.httpDeps ++ Scalaz.deps ++ Specs2.deps ++ Ficus.deps
+    TypesafeDependencies.json
+  ) ++ Akka.coreDeps ++ Akka.httpDeps ++ Scalaz.deps ++ Specs2.deps ++ Ficus.deps ++ Dispatch.deps
 
   lazy val core = Project(
     id   = "MEOW-Core",
