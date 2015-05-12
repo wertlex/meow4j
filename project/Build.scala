@@ -17,7 +17,8 @@ object ApplicationBuild extends Build {
   )
 
   lazy val coreDeps = Seq(
-    TypesafeDependencies.json
+    TypesafeDependencies.json,
+    ApacheLibs.commons.codec
   ) ++ Akka.coreDeps ++ Akka.httpDeps ++ Scalaz.deps ++ Specs2.deps ++ Ficus.deps ++ Dispatch.deps
 
   lazy val core = Project(
