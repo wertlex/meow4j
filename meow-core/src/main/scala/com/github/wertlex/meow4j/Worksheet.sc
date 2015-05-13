@@ -1,4 +1,4 @@
-import com.github.wertlex.meow4j.DispatchNeoRestClient
+import com.github.wertlex.meow4j.{CypherStatement, CypherQuery, Database, DispatchNeoRestClient}
 import dispatch._
 import dispatch.Defaults._
 import play.api.libs.json._
@@ -45,6 +45,17 @@ val jsObj = Json.parse(textCypher).as[JsObject]
 Await.result(client.query(jsObj), 10 seconds)
 
 Await.result(client.startTx(jsObj), 10 seconds)
+
+val db = new Database(client)
+
+val cypherQuery = CypherQuery("""CREATE (n {name: "Alex"}) RETURN n""")
+
+val dualCypherQuery = CypherQuery.DefaultCypherQuery(List(
+  CypherStatement("""CREATE (n {name: "Alex"}), (a) RETURN n,a """),
+  CypherStatement("""CREATE (n {name: "John"}) RETURN n""")
+))
+
+Await.result(db.query(dualCypherQuery), 10 seconds)
 
 
 

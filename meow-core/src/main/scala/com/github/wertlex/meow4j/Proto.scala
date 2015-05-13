@@ -14,9 +14,24 @@ import scala.util.control.NonFatal
  * Date: 11.05.15
  * Time: 20:28
  */
-class Database {
+class Database(client: NeoRestClient) {
 
-  def query[QUERY <% CypherQuery](cypher: QUERY): QueryBuilder = ???
+  def query[QUERY <% CypherQuery](cypher: QUERY) = {
+    client.query(cypherQueryWrites.writes(cypher))
+  }
+
+  private implicit val cypherStatementWrites: OWrites[CypherStatement] = new OWrites[CypherStatement] {
+    override def writes(o: CypherStatement) = Json.obj(
+      "statement" -> o.statement
+//      "parameters"  ->  // TODO: implement me
+    )
+  }
+
+  private implicit val cypherQueryWrites: OWrites[CypherQuery] = new OWrites[CypherQuery] {
+    override def writes(o: CypherQuery): JsObject = Json.obj(
+      "statements" -> o.statements
+    )
+  }
 }
 
 object Database {
@@ -196,5 +211,11 @@ object Models {
     node_labels:        String,
     neo4j_version:      String
   )
+
+}
+
+
+object Parsers {
+
 
 }
