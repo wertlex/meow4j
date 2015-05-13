@@ -7,6 +7,8 @@ import dispatch.Defaults._
 import play.api.libs.json._
 import org.apache.commons.codec.binary.Base64
 
+import scala.util.control.NonFatal
+
 /**
  * User: wert
  * Date: 11.05.15
@@ -37,9 +39,9 @@ trait NeoRestClient {
   def query(jsData: JsObject): Future[NeoRestClient.Response]
   def startTx(jsData: JsObject): Future[NeoRestClient.Response]
   def queryInTx(txId: String, jsData: JsObject): Future[NeoRestClient.Response]
-  def resetTimeoutTx(): Future[JsObject]
-  def commitTx(jsData: JsObject): Future[JsObject]
-  def rollbackTx(): Future[JsObject]
+  def resetTimeoutTx(txId: String): Future[NeoRestClient.Response]
+  def commitTx(txId: String, jsData: JsObject): Future[NeoRestClient.Response]
+  def rollbackTx(txId: String): Future[NeoRestClient.Response]
 }
 
 object NeoRestClient {
@@ -47,7 +49,12 @@ object NeoRestClient {
   case class Auth(login: String, pass: String)
 }
 
-class DispatchNeoRestClient(uri: String, ssl: Boolean, auth: Option[NeoRestClient.Auth]) /*extends NeoRestClient*/ {
+class DispatchNeoRestClient(uri: String, ssl: Boolean, auth: Option[NeoRestClient.Auth]) extends NeoRestClient {
+
+  def ping: Future[Boolean] = {
+    getServiceRoot.map(_ => true).recover { case NonFatal(e) => false}
+  }
+
   def getServiceRoot: Future[NeoRestClient.Response] = {
     val query = url(s"$uri/db/data/")
       .GET
@@ -80,6 +87,45 @@ class DispatchNeoRestClient(uri: String, ssl: Boolean, auth: Option[NeoRestClien
       .addHeader("Accept", "application/json; charset=UTF-8")
       .addHeader("Content-Type", "application/json")
       .addOptHeader("Authorization", optionalAuthHeaderValue) << jsData.toString()
+
+    val pair = query > responseToNeoResponse _
+
+    Http(pair)
+  }
+
+  def queryInTx(txId: String, jsData: JsObject): Future[NeoRestClient.Response] = {
+    val query = url(s"$uri/db/data/transaction/$txId")
+      .POST
+      .addHeader("Accept", "application/json; charset=UTF-8")
+      .addHeader("Content-Type", "application/json")
+      .addOptHeader("Authorization", optionalAuthHeaderValue) << jsData.toString()
+
+    val pair = query > responseToNeoResponse _
+
+    Http(pair)
+  }
+
+  def resetTimeoutTx(txId: String): Future[NeoRestClient.Response] = {
+    queryInTx(txId, Json.parse("""{"statements" : [ ]}""").as[JsObject])
+  }
+
+  def commitTx(txId: String, jsData: JsObject): Future[NeoRestClient.Response] = {
+    val query = url(s"$uri/db/data/transaction/$txId/commit")
+      .POST
+      .addHeader("Accept", "application/json; charset=UTF-8")
+      .addHeader("Content-Type", "application/json")
+      .addOptHeader("Authorization", optionalAuthHeaderValue) << jsData.toString()
+
+    val pair = query > responseToNeoResponse _
+
+    Http(pair)
+  }
+
+  def rollbackTx(txId: String): Future[NeoRestClient.Response] = {
+    val query = url(s"$uri/db/data/transaction/$txId/commit")
+      .DELETE
+      .addHeader("Accept", "application/json; charset=UTF-8")
+      .addOptHeader("Authorization", optionalAuthHeaderValue)
 
     val pair = query > responseToNeoResponse _
 
