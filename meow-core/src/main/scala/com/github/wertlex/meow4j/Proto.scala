@@ -26,10 +26,32 @@ object Database {
 }
 
 
-
-
-class CypherQuery
 class QueryBuilder
+
+trait CypherQuery {
+  def statements: List[CypherStatement]
+}
+
+object CypherQuery {
+  case class DefaultCypherQuery(statements: List[CypherStatement]) extends CypherQuery
+
+  def apply(statement: String): CypherQuery = DefaultCypherQuery(List(CypherStatement(statement)))
+}
+
+
+trait CypherStatement {
+  def statement: String
+  def parameters: Map[String, Map[String, Any]]
+}
+
+object CypherStatement {
+  case class DefaultCypherStatement(statement: String, parameters: Map[String, Map[String, Any]]) extends CypherStatement
+
+  def apply(statement: String): CypherStatement = DefaultCypherStatement(statement, Map())
+  def apply(statement: String, parameters: Map[String, Map[String, Any]]): CypherStatement = DefaultCypherStatement(
+    statement, parameters
+  )
+}
 
 
 
@@ -52,7 +74,7 @@ object NeoRestClient {
 class DispatchNeoRestClient(uri: String, ssl: Boolean, auth: Option[NeoRestClient.Auth]) extends NeoRestClient {
 
   def ping: Future[Boolean] = {
-    getServiceRoot.map(_ => true).recover { case NonFatal(e) => false}
+    getServiceRoot.map(_ => true).recover { case NonFatal(e) => false }
   }
 
   def getServiceRoot: Future[NeoRestClient.Response] = {
@@ -78,7 +100,6 @@ class DispatchNeoRestClient(uri: String, ssl: Boolean, auth: Option[NeoRestClien
 
     Http(pair)
   }
-
 
 
   def startTx(jsData: JsObject): Future[NeoRestClient.Response] = {
