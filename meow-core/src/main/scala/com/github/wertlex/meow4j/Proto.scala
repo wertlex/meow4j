@@ -214,8 +214,52 @@ object Models {
 
 }
 
-
+/** Maybe someday it will be ported to scala parser combinators. But not today */
 object Parsers {
 
+  import scalaz._
+  import Scalaz._
 
+  trait RowParser[A] {
+    def parse(row: List[JsValue]): Option[A]
+  }
+
+  /** Return row as is */
+  object AsIsRowParser extends RowParser[List[JsValue]] {
+    def parse(row: List[JsValue]): Option[List[JsValue]] = Option(row)
+  }
+
+  /** Parse row into String. Not really a parser, but converter */
+  object StringRowParser extends RowParser[String] {
+    def parse(row: List[JsValue]): Option[String] = Option(row.toString())
+  }
+
+  class FirstItemRowParser[A](reads: Reads[A]) extends RowParser[A] {
+    def parse(row: List[JsValue]): Option[A] = row.headOption.flatMap(js => js.asOpt[A](reads))
+  }
+
+  class ListRowParser[A](reads: Reads[A]) extends RowParser[List[A]] {
+    def parse(row: List[JsValue]): Option[List[A]] = row.map(js => js.asOpt[A](reads)).sequence
+  }
+
+  class Tuple2RowParser[A, B](aReads: Reads[A], bReads: Reads[B]) extends RowParser[(A, B)] {
+    def parse(row: List[JsValue]): Option[(A, B)] =
+      for {
+        verifiedRow <- Option(row).filter(_.size >= 2)
+        vRow        = verifiedRow.toVector
+        a           <- vRow(0).asOpt[A](aReads)
+        b           <- vRow(1).asOpt[B](bReads)
+      } yield (a, b)
+  }
+
+  class Tuple3RowParser[A, B, C](aReads: Reads[A], bReads: Reads[B], cReads: Reads[C]) extends RowParser[(A, B, C)] {
+    def parse(row: List[JsValue]): Option[(A, B, C)] =
+      for {
+        verifiedRow <- Option(row).filter(_.size >= 3)
+        vRow        = verifiedRow.toVector
+        a           <- vRow(0).asOpt[A](aReads)
+        b           <- vRow(1).asOpt[B](bReads)
+        c           <- vRow(2).asOpt[C](cReads)
+      } yield (a, b, c)
+  }
 }
