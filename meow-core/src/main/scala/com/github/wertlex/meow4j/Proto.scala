@@ -1,6 +1,6 @@
 package com.github.wertlex.meow4j
 
-import com.github.wertlex.meow4j.Models.Metadata
+import com.github.wertlex.meow4j.Models.{ErrorData, DefaultResponse, Metadata}
 import com.ning.http.client.{Response => NingResponse}
 import dispatch._
 import dispatch.Defaults._
@@ -8,6 +8,8 @@ import play.api.libs.json._
 import org.apache.commons.codec.binary.Base64
 
 import scala.util.control.NonFatal
+import play.api.libs.functional.syntax._
+import play.api.libs.json.Reads._
 
 /**
  * User: wert
@@ -16,8 +18,13 @@ import scala.util.control.NonFatal
  */
 class Database(client: NeoRestClient) {
 
+  import Models._
+
   def query[QUERY <% CypherQuery](cypher: QUERY) = {
-    client.query(cypherQueryWrites.writes(cypher))
+    client.query(cypherQueryWrites.writes(cypher)).map{ response =>
+      response.body.as[DefaultResponse]
+    }
+
   }
 
   private implicit val cypherStatementWrites: OWrites[CypherStatement] = new OWrites[CypherStatement] {
@@ -41,7 +48,17 @@ object Database {
 }
 
 
-class QueryBuilder
+class QueryBuilder(futureResponse: Future[DefaultResponse]) {
+  def raw: Future[List[ErrorData] Either List[List[JsValue]]] = {
+    futureResponse.map { response =>
+      response.results.flatMap(_.data.map(_.row))
+    }
+    ???
+  }
+
+  def as = ???
+  def run = ???
+}
 
 trait CypherQuery {
   def statements: List[CypherStatement]
@@ -212,6 +229,64 @@ object Models {
     neo4j_version:      String
   )
 
+  trait Response {
+    def results:  List[ResultData]
+    def errors:   List[ErrorData]
+  }
+
+  case class DefaultResponse(
+    results:  List[ResultData],
+    errors:   List[ErrorData]
+  ) extends Response {
+//    lazy val rows: List[List[JsValue]] =
+  }
+
+  case class TxResponse(
+    results:      List[ResultData],
+    errors:       List[ErrorData],
+    commit:       String,
+    transaction:  TransactionData
+  ) extends Response
+
+  case class ResultData(columns: List[String], data: List[RowData])
+  case class RowData(row: List[JsValue])
+  case class ErrorData(code: String, message: String)
+  case class TransactionData(expires: String)
+
+
+
+  implicit val errorDataReads: Reads[ErrorData] = (
+    (__ \ "code").read[String] ~
+    (__ \ "message").read[String]
+  )(ErrorData.apply _)
+
+  implicit val transactionDataReads: Reads[TransactionData] = new Reads[TransactionData] {
+    override def reads(json: JsValue): JsResult[TransactionData] =
+      (json \ "expires").validate[String].map(TransactionData(_))
+  }
+
+  implicit val rowDataReads: Reads[RowData] = new Reads[RowData] {
+    override def reads(json: JsValue): JsResult[RowData] = {
+      (json \ "row").validate[JsArray].map(jsArr => RowData(jsArr.value.toList))
+    }
+  }
+
+  implicit val resultDataReads: Reads[ResultData] = (
+    (__ \ "columns").read[List[String]] ~
+    (__ \ "data").read[List[RowData]]
+  )(ResultData.apply _)
+
+  implicit val defaultResponseReads: Reads[DefaultResponse] = (
+    (__ \ "results").read[List[ResultData]] ~
+      (__ \ "errors").read[List[ErrorData]]
+    )(DefaultResponse)
+
+  implicit val txResponseReads: Reads[TxResponse] = (
+    (__ \ "results").read[List[ResultData]] ~
+      (__ \ "errors").read[List[ErrorData]] ~
+      (__ \ "commit").read[String] ~
+      (__ \ "transaction").read[TransactionData]
+    )(TxResponse)
 }
 
 /** Maybe someday it will be ported to scala parser combinators. But not today */

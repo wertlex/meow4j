@@ -58,6 +58,3 @@ val dualCypherQuery = CypherQuery.DefaultCypherQuery(List(
 Await.result(db.query(dualCypherQuery), 10 seconds)
 
 
-
-
-
