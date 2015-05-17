@@ -9,7 +9,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 /**
- * Check docuumentation on protocol implemented here:
+ * Check docuumentation on protocol implementation here:
  * http://neo4j.com/docs/milestone/rest-api.html
  * User: wert
  * Date: 17.05.15
