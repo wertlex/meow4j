@@ -46,7 +46,22 @@ class DispatchNeoRestClientSpecs extends Specification with NoTimeConversions{
       (response.body \ "neo4j_version").asOpt[String] must beSome
       (response.body \ "node").asOpt[String] must beSome
     }
+
+    "return failed future when there is no such database" in {
+      val client = getBrokenClient()
+      // waiting for value and converting it to Try
+      val r = Await.ready(client.getServiceRoot, 10 seconds)
+      r.value must beSome
+      r.value.get must beFailedTry
+    }
   }
+
+//  "DispatchNeoRestClient#query" should {
+//    "perform individual query" in {
+//      val client = getNewClient()
+//
+//    }
+//  }
 
 }
 
