@@ -1,11 +1,12 @@
-import com.github.wertlex.meow4j.{CypherStatement, CypherQuery, Database, DispatchNeoRestClient}
+import com.github.wertlex.meow4j.{CypherStatement, CypherQuery, Database}
+import com.github.wertlex.meow4j.restclient.DispatchNeoRestClient
 import dispatch._
 import dispatch.Defaults._
 import play.api.libs.json._
 
 import scala.concurrent.duration._
 import scala.concurrent._
-import com.github.wertlex.meow4j.NeoRestClient.Auth
+import com.github.wertlex.meow4j.restclient.NeoRestClient.Auth
 
 val svc = url("http://api.hostip.info/country.php")
 val country = Http(svc.OK(as.String))
