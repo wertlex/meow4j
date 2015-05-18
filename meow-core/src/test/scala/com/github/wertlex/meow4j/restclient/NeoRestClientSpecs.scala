@@ -3,6 +3,7 @@ package com.github.wertlex.meow4j.restclient
 import com.github.wertlex.meow4j.restclient.NeoRestClient.Auth
 import org.specs2.mutable.Specification
 import org.specs2.time.NoTimeConversions
+import play.api.libs.json._
 import scala.concurrent.duration._
 import scala.concurrent._
 
@@ -56,12 +57,126 @@ class DispatchNeoRestClientSpecs extends Specification with NoTimeConversions{
     }
   }
 
-//  "DispatchNeoRestClient#query" should {
-//    "perform individual query" in {
-//      val client = getNewClient()
-//
-//    }
-//  }
+  "DispatchNeoRestClient#query" should {
+    "perform individual query" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """CREATE (n {name: "Alex"}) RETURN n""")
+        )
+      )
+
+      val r = Await.result( client.query(query), 10 seconds)
+      r.status must beEqualTo(200)
+      val expectedJson = Json.parse(
+        """
+          |{
+          |  "results":[
+          |    {
+          |      "columns":["n"],
+          |      "data":[{
+          |        "row":[{"name":"Alex"}]
+          |      }]
+          |     }
+          |   ],
+          |  "errors":[]
+          |} """.stripMargin)
+
+      r.body must beEqualTo(expectedJson)
+    }
+
+    "perform multiple queries in one request" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """CREATE (n {name: "Alex"}) RETURN n"""),
+          Json.obj("statement" -> """CREATE (a {name: "Mike"}) RETURN a""")
+        )
+      )
+      val r = Await.result(client.query(query), 10 seconds)
+      r.status must beEqualTo(200)
+      val expectedJson = Json.parse(
+        """
+          |{
+          | "results": [
+          |   {
+          |    "columns":["n"],
+          |    "data":[
+          |      {"row":[{"name":"Alex"}]}
+          |    ]
+          |   },
+          |   {
+          |    "columns":["a"],
+          |    "data":[
+          |     {"row":[{"name":"Mike"}]}
+          |    ]}
+          | ],
+          | "errors":[]
+          |}""".stripMargin)
+      r.body must beEqualTo(expectedJson)
+    }
+
+    "perform all queries before broken one, not perform after and contain an error" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """CREATE (n {name: "Alex"}) RETURN n"""),
+          Json.obj("statement" -> """CREATE (a {name: "Mike"}) RETURN a"""),
+          Json.obj("statement" -> """CREATE (a {name: "John"}) RETURN a1"""), // a1 instead a intentionally to make an error
+          Json.obj("statement" -> """CREATE (a {name: "Jack"}) RETURN a""")
+        )
+      )
+      val r = Await.result(client.query(query), 10 seconds)
+      r.status must beEqualTo(200)
+      val expectedJsonResult = Json.parse(
+        """
+          |[
+          |   {
+          |    "columns":["n"],
+          |    "data":[
+          |      {"row":[{"name":"Alex"}]}
+          |    ]
+          |   },
+          |   {
+          |    "columns":["a"],
+          |    "data":[
+          |     {"row":[{"name":"Mike"}]}
+          |    ]}
+          |]
+          |""".stripMargin)
+
+      (r.body \ "results") must beEqualTo(expectedJsonResult)
+      (r.body \ "errors").as[JsArray].value.size must beEqualTo(1)
+    }
+
+    "return an error on single broken query" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """My Name is Bond. James Bond""")
+        )
+      )
+
+      val r = Await.result( client.query(query), 10 seconds)
+      r.status must beEqualTo(200)
+      (r.body \ "errors").as[JsArray].value.size must beEqualTo(1)
+    }
+
+    "return an error on bad json" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statementz"  -> Json.arr(
+          Json.obj("z_tatement" -> """My Name is Bond. James Bond""")
+        )
+      )
+
+      val r = Await.result( client.query(query), 10 seconds)
+      r.status must beEqualTo(200)
+      ((r.body \ "errors").as[JsArray].apply(0) \ "code").as[String] must beEqualTo("Neo.ClientError.Request.InvalidFormat")
+    }
+
+  }
+
 
 }
 
