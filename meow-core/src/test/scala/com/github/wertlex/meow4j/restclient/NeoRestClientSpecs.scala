@@ -177,6 +177,89 @@ class DispatchNeoRestClientSpecs extends Specification with NoTimeConversions{
 
   }
 
+  "DispatchNeoRestClient#startTx" should {
+    "return transaction details in `commit` and `transaction` fields" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """CREATE (n {name: "Alex"}) RETURN n""")
+        )
+      )
+      val result = Await.result(client.startTx(query), 10 seconds)
+      result.status must beEqualTo(201)
+      (result.body \ "commit").asOpt[String] must beSome
+      (result.body \ "results").asOpt[JsArray] must beSome
+      (result.body \ "transaction" \ "expires").asOpt[String] must beSome
+    }
+
+    "perform simple queries" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """CREATE (n {name: "Alex"}) RETURN n""")
+        )
+      )
+
+      val r = Await.result( client.startTx(query), 10 seconds)
+      r.status must beEqualTo(201)
+      (r.body \ "results").as[JsArray].value.size must beEqualTo(1)
+    }
+
+    "perform multiple queries in one request" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """CREATE (n {name: "Alex"}) RETURN n"""),
+          Json.obj("statement" -> """CREATE (a {name: "Mike"}) RETURN a""")
+        )
+      )
+      val r = Await.result(client.startTx(query), 10 seconds)
+      r.status must beEqualTo(201)
+      (r.body \ "results").as[JsArray].value.size must beEqualTo(2)
+    }
+
+    "perform all queries before broken one, not perform after and contain an error" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """CREATE (n {name: "Alex"}) RETURN n"""),
+          Json.obj("statement" -> """CREATE (a {name: "Mike"}) RETURN a"""),
+          Json.obj("statement" -> """CREATE (a {name: "John"}) RETURN a1"""), // a1 instead a intentionally to make an error
+          Json.obj("statement" -> """CREATE (a {name: "Jack"}) RETURN a""")
+        )
+      )
+      val r = Await.result(client.startTx(query), 10 seconds)
+      r.status must beEqualTo(201)
+      (r.body \ "results").as[JsArray].value.size must beEqualTo(2)
+      (r.body \ "errors").as[JsArray].value.size must beEqualTo(1)
+    }
+
+    "return an error on single broken query" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statements"  -> Json.arr(
+          Json.obj("statement" -> """My Name is Bond. James Bond""")
+        )
+      )
+
+      val r = Await.result( client.startTx(query), 10 seconds)
+      r.status must beEqualTo(201)
+      (r.body \ "errors").as[JsArray].value.size must beEqualTo(1)
+    }
+
+    "return an error on bad json" in {
+      val client = getNewClient()
+      val query = Json.obj(
+        "statementz"  -> Json.arr(
+          Json.obj("z_tatement" -> """My Name is Bond. James Bond""")
+        )
+      )
+
+      val r = Await.result( client.startTx(query), 10 seconds)
+      r.status must beEqualTo(201)
+      ((r.body \ "errors").as[JsArray].apply(0) \ "code").as[String] must beEqualTo("Neo.ClientError.Request.InvalidFormat")
+    }
+  }
 
 }
 
