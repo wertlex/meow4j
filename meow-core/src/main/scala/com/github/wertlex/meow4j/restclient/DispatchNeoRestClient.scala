@@ -45,12 +45,12 @@ class DispatchNeoRestClient(uri: String, ssl: Boolean, auth: Option[NeoRestClien
   }
 
 
-  def startTx(jsData: JsObject)(implicit ec: ExecutionContext): Future[NeoRestClient.Response] = {
+  def startTx(optJsData: Option[JsObject])(implicit ec: ExecutionContext): Future[NeoRestClient.Response] = {
     val query = url(s"$uri/db/data/transaction")
       .POST
       .addHeader("Accept", "application/json; charset=UTF-8")
       .addHeader("Content-Type", "application/json")
-      .addOptHeader("Authorization", optionalAuthHeaderValue) << jsData.toString()
+      .addOptHeader("Authorization", optionalAuthHeaderValue) <<? optJsData.map(_.toString())
 
     val pair = query > responseToNeoResponse _
 
@@ -110,12 +110,16 @@ class DispatchNeoRestClient(uri: String, ssl: Boolean, auth: Option[NeoRestClien
   }
 
   /** Add .addOptHeader() method to Req */
-  private implicit class ReqWithOptionalHeader(req: Req) {
+  private implicit class ReqWithExtraMethods(req: Req) {
     def addOptHeader(headerName: String, optHeaderValue: Option[String]): Req = optHeaderValue match {
       case Some(v)  => req.addHeader(headerName, v)
       case None     => req
     }
 
+    def <<?(optBody: Option[String]): Req = optBody match {
+      case Some(b)  => req << b
+      case None     => req
+    }
   }
 }
 

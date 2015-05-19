@@ -21,7 +21,7 @@ trait NeoRestClient {
   def ping(implicit ec: ExecutionContext):                                      Future[Boolean]
   def getServiceRoot(implicit ec: ExecutionContext):                            Future[NeoRestClient.Response]
   def query(jsData: JsObject)(implicit ec: ExecutionContext):                   Future[NeoRestClient.Response]
-  def startTx(jsData: JsObject)(implicit ec: ExecutionContext):                 Future[NeoRestClient.Response]
+  def startTx(optJsData: Option[JsObject])(implicit ec: ExecutionContext):      Future[NeoRestClient.Response]
   def queryInTx(txId: String, jsData: JsObject)(implicit ec: ExecutionContext): Future[NeoRestClient.Response]
   def resetTimeoutTx(txId: String)(implicit ec: ExecutionContext):              Future[NeoRestClient.Response]
   def commitTx(txId: String, jsData: JsObject)(implicit ec: ExecutionContext):  Future[NeoRestClient.Response]
